@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Escondite Inglés - Juego de Dados</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      display: flex;
+      flex-direction: row;
+      gap: 20px;
+    }
+    .board {
+      display: flex;
+      gap: 20px;
+    }
+    .path {
+      display: flex;
+      flex-direction: column-reverse;
+      justify-content: start;
+      align-items: center;
+      width: 80px;
+      background-color: #f4f4f4;
+      border: 1px solid #ccc;
+      padding: 5px;
+      position: relative;
+    }
+    .cell {
+      width: 60px;
+      height: 60px;
+      border: 1px solid #999;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background-color: #fff;
+      position: relative;
+    }
+    .player {
+      font-size: 28px;
+      position: absolute;
+      transition: transform 0.3s ease;
+    }
+    .heart::after {
+      content: " ❤️";
+      font-size: 16px;
+      position: absolute;
+      top: -10px;
+      right: -10px;
+    }
+    .controls {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    button {
+      padding: 5px 10px;
+    }
+    .top-figure {
+      font-size: 32px;
+      margin-bottom: 5px;
+      transition: transform 0.3s ease;
+    }
+  </style>
+</head>
+<body>
+  <div class="board" id="board"></div>
+  <div class="controls">
+    <h3>Turno</h3>
+    <div id="buttons"></div>
+    <button onclick="sacada()">TIRADA</button>
+    <div id="log"></div>
+  </div>
+
+  <script>
+    const players = [
+      { name: 'Jugador 1', position: 0, moving: null, heart: false, emoji: '🧍‍♂️', rotate: false },
+      { name: 'Jugador 2', position: 0, moving: null, heart: false, emoji: '🧍‍♀️', rotate: false },
+      { name: 'Jugador 3', position: 0, moving: null, heart: false, emoji: '🧍', rotate: false },
+    ];
+
+    const boardSize = 10;
+    const diceBag = ['Negro1', 'Negro2', 'Negro3', 'Rojo'];
+    let usedBlackDice = [];
+
+    const blackDice = {
+      Negro1: [1, 1, 1, 1, 2, 2],
+      Negro2: [1, 1, 1, 1, 0, 0],
+      Negro3: [1, 1, 0, 0, 0, 0],
+    };
+
+    const redDie = [1, 1, 1, 1, 1, 0];
+    const redPenaltyDie = [1, 2];
+
+    function drawBoard() {
+      const board = document.getElementById('board');
+      board.innerHTML = '';
+      players.forEach((player, idx) => {
+        const path = document.createElement('div');
+        path.className = 'path';
+
+        const figure = document.createElement('div');
+        figure.className = 'top-figure';
+        figure.textContent = player.emoji;
+        figure.style.transform = player.rotate ? 'rotateY(180deg)' : 'rotateY(0deg)';
+        path.appendChild(figure);
+
+        for (let i = 0; i < boardSize; i++) {
+          const cell = document.createElement('div');
+          cell.className = 'cell';
+          if (i === player.position) {
+            const piece = document.createElement('div');
+            piece.className = `player${player.heart ? ' heart' : ''} player`;
+            piece.textContent = player.emoji;
+            piece.style.transform = player.rotate ? 'rotateY(180deg)' : 'rotateY(0deg)';
+            cell.appendChild(piece);
+          }
+          path.appendChild(cell);
+        }
+        board.appendChild(path);
+      });
+    }
+
+    function drawButtons() {
+      const btns = document.getElementById('buttons');
+      btns.innerHTML = '';
+      players.forEach((_, idx) => {
+        const group = document.createElement('div');
+        ['andar', 'pararse'].forEach(action => {
+          const btn = document.createElement('button');
+          btn.textContent = `Jugador ${idx + 1} - ${action}`;
+          btn.onclick = () => {
+            if (players[idx].moving !== null) {
+              alert(`Jugador ${idx + 1} ya ha elegido una acción.`);
+              return;
+            }
+            players[idx].moving = action;
+            group.querySelectorAll('button').forEach(b => b.disabled = true);
+          };
+          group.appendChild(btn);
+        });
+        btns.appendChild(group);
+      });
+    }
+
+    function sacarDado() {
+      if (diceBag.length === 0) {
+        diceBag.push('Negro1', 'Negro2', 'Negro3', 'Rojo');
+        usedBlackDice = [];
+      }
+      const i = Math.floor(Math.random() * diceBag.length);
+      return diceBag.splice(i, 1)[0];
+    }
+
+    function lanzar(dado) {
+      const caras = dado === 'Rojo' ? redDie : blackDice[dado];
+      return caras[Math.floor(Math.random() * caras.length)];
+    }
+
+    function lanzarRojoPenalizacion() {
+      return redPenaltyDie[Math.floor(Math.random() * redPenaltyDie.length)];
+    }
+
+    function sacada() {
+      const log = document.getElementById('log');
+      if (!players.every(p => p.moving !== null)) {
+        alert("Todos los jugadores deben elegir una acción.");
+        return;
+      }
+      const dado = sacarDado();
+      log.innerHTML += `<p>Se ha sacado el dado: ${dado}</p>`;
+
+      players.forEach((player, idx) => {
+        const resultado = lanzar(dado);
+        if (player.moving === 'pararse') {
+          player.rotate = false;
+          if (dado === 'Rojo' && !player.heart) {
+            player.heart = true;
+          }
+        } else if (player.moving === 'andar') {
+          player.rotate = true;
+          if (dado.startsWith('Negro')) {
+            usedBlackDice.push(dado);
+            let avance = resultado;
+            player.position = Math.min(boardSize - 1, player.position + avance);
+          } else if (dado === 'Rojo') {
+            if (player.heart) {
+              player.heart = false;
+            } else {
+              let retroceso = lanzarRojoPenalizacion();
+              player.position = Math.max(0, player.position - retroceso);
+            }
+          }
+        }
+        player.moving = null;
+      });
+
+      drawBoard();
+      drawButtons();
+      if (players.some(p => p.position >= boardSize - 1)) {
+        alert('¡Tenemos un ganador!');
+      }
+    }
+
+    drawBoard();
+    drawButtons();
+  </script>
+</body>
+</html>
